@@ -1,0 +1,44 @@
+# ComboBox可编辑状态下，当Items更新时Text不清空
+**场景**：实际应用该控件时，遇到了一个问题，当下拉选择一项后，ComboBox.Text即为选择的值，若此时ComboBox所绑定的集合更改，不包含上此选择的项，ComboBox.Text值将会清空，但有这样的场景不需要清空。
+**解决方案**：查看源码了解到事件的触发顺序是下面这样。
+     ItemChanged->SelectionChanged->更新Text依赖属性->更新EditableText或更新当前选中项（依IsEditable而定）
+     对于更新Text依赖属性及更新EditableText可以通过设置ComboBox的属性UpdatingText=true避免其执行，而更新当前选中项不容易控制，所以下面代码针对可编辑的ComboBox实现的自定义控件，可以实现Items集合更改时，其Text属性则不会更改，且不会触发TextChanged事件。
+```     
+public class MyCombox : ComboBox
+    {
+        private string _previousText;
+        private int _previousIndex;
+
+        protected override void OnSelectionChanged( SelectionChangedEventArgs e)
+        {
+            if (! IsEditable)
+            {
+                base.OnSelectionChanged(e);
+            }
+            else
+            {
+                bool ifCanChangedText = true;
+                if (_previousIndex != -1 && SelectedIndex == - 1 && !Items. Contains(_previousText))
+                {
+                    ifCanChangedText = false ;
+                    SetUpdatingText( true);
+                }
+
+                base.OnSelectionChanged(e);
+
+                if (! ifCanChangedText)
+                    SetUpdatingText( false);
+
+                _previousText = Text;
+                _previousIndex = SelectedIndex;
+            }
+        }
+
+        private void SetUpdatingText(bool val)
+        {
+            var pro = typeof ( ComboBox). GetProperty("UpdatingText", BindingFlags .Instance | BindingFlags. NonPublic);
+            if (null != pro)
+                pro .SetValue(this , val);
+        }
+    }
+```
